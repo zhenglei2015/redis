@@ -265,6 +265,7 @@ int selectDb(client *c, int id) {
 
 void signalModifiedKey(redisDb *db, robj *key) {
     touchWatchedKey(db,key);
+    //calculateCategoryMemorySpace(key);
 }
 
 void signalFlushedDb(int dbid) {

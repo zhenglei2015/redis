@@ -770,6 +770,8 @@ struct redisServer {
     size_t resident_set_size;       /* RSS sampled in serverCron(). */
     long long stat_net_input_bytes; /* Bytes read from network. */
     long long stat_net_output_bytes; /* Bytes written to network. */
+    long long pre_memory_alloc;
+    dict* categoryStatsDict;
     /* The following two are used to track instantaneous metrics, like
      * number of operations per second, network traffic. */
     struct {
@@ -1079,7 +1081,7 @@ uint64_t crc64(uint64_t crc, const unsigned char *s, uint64_t l);
 void exitFromChild(int retcode);
 size_t redisPopcount(void *s, long count);
 void redisSetProcTitle(char *title);
-
+void calculateCategoryMemorySpace(robj *key);
 /* networking.c -- Networking and Client related operations */
 client *createClient(int fd);
 void closeTimedoutClients(void);
@@ -1474,6 +1476,7 @@ void setnxCommand(client *c);
 void setexCommand(client *c);
 void psetexCommand(client *c);
 void getCommand(client *c);
+void getStatCommand(client *c);
 void delCommand(client *c);
 void existsCommand(client *c);
 void setbitCommand(client *c);
