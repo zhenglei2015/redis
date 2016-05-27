@@ -190,9 +190,12 @@ int dbDelete(redisDb *db, robj *key) {
     /* Deleting an entry from the expires dict will not free the sds of
      * the key, because it is shared with the main dictionary. */
     if (dictSize(db->expires) > 0) dictDelete(db->expires,key->ptr);
-    dictEntry *di = dictFind(server.categoryStatsDict, key);
-    sds* oldv = dictGetVal(di);
-    addCateforyStats(key, sdsalloc(*oldv));
+    sds category = getKeyCategory(key);
+    dictEntry *di = dictFind(server.categoryStatsDict, category);
+    if(di) {
+        sds oldv = dictGetVal(di);
+        addCateforyStats(key, 0 - sdsalloc(oldv));
+    }
     if (dictDelete(db->dict,key->ptr) == DICT_OK) {
         if (server.cluster_enabled) slotToKeyDel(key);
         return 1;
@@ -270,7 +273,6 @@ int selectDb(client *c, int id) {
 
 void signalModifiedKey(redisDb *db, robj *key) {
     touchWatchedKey(db,key);
-    //calculateCategoryMemorySpace(key);
 }
 
 void signalFlushedDb(int dbid) {

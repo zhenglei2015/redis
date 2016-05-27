@@ -1082,6 +1082,8 @@ void exitFromChild(int retcode);
 size_t redisPopcount(void *s, long count);
 void redisSetProcTitle(char *title);
 void addCateforyStats(robj *key, int size);
+sds getKeyCategory(robj *key);
+
 /* networking.c -- Networking and Client related operations */
 client *createClient(int fd);
 void closeTimedoutClients(void);

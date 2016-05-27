@@ -3823,6 +3823,20 @@ void redisSetProcTitle(char *title) {
 #endif
 }
 
+sds getKeyCategory(robj *key) {
+    int len = strlen(key->ptr);
+    char *categoryKey = (char *)sdsnewlen(key->ptr, len);
+    for(int i = 0; i < len; i++) {
+        if(categoryKey[i] == '.') {
+            categoryKey[i] = '\0';
+            break;
+        }
+        if(i == len - 1)
+            return NULL;
+    }
+    sds k = sdsnewlen(categoryKey, strlen(categoryKey));// 这一步没必要
+    return k;
+}
 void addCateforyStats(robj *key, int valsize) {
     int len = strlen(key->ptr);
     char *categoryKey = (char *)sdsnewlen(key->ptr, len);
