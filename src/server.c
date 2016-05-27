@@ -3823,7 +3823,17 @@ void redisSetProcTitle(char *title) {
 #endif
 }
 
-void addCateforyStats(robj *k, int valsize) {
+void addCateforyStats(robj *key, int valsize) {
+    int len = strlen(key->ptr);
+    char *categoryKey = (char *)sdsnewlen(key->ptr, len);
+    for(int i = 0; i < len; i++) {
+        if(categoryKey[i] == '.') {
+            categoryKey[i] = '\0';
+            break;
+        }
+    }
+    sds k = sdsnewlen(categoryKey, strlen(categoryKey));// 这一步没必要
+
     long long change = valsize;
     char changeStr[50];
     dictEntry *di;
