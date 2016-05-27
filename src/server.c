@@ -3838,6 +3838,7 @@ sds getKeyCategory(robj *key) {
     return k;
 }
 void addCateforyStats(robj *key, int valsize) {
+    printf("aaaa %d\n", valsize);
     int len = strlen(key->ptr);
     char *categoryKey = (char *)sdsnewlen(key->ptr, len);
     for(int i = 0; i < len; i++) {
