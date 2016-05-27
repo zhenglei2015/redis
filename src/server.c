@@ -124,6 +124,7 @@ struct redisServer server; /* server global state */
  */
 struct redisCommand redisCommandTable[] = {
     {"get",getCommand,2,"rF",0,NULL,1,1,1,0,0},
+    {"getStat",getStatCommand,2,"rF",0,NULL,1,1,1,0,0},
     {"set",setCommand,-3,"wm",0,NULL,1,1,1,0,0},
     {"setnx",setnxCommand,3,"wmF",0,NULL,1,1,1,0,0},
     {"setex",setexCommand,4,"wm",0,NULL,1,1,1,0,0},
@@ -657,6 +658,15 @@ dictType replScriptCacheDictType = {
     dictSdsDestructor,          /* key destructor */
     NULL                        /* val destructor */
 };
+/* category StatsDictType */
+dictType categoryStatsDictType = {
+    dictSdsHash,                /* hash function */
+    NULL,                       /* key dup */
+    NULL,                       /* val dup */
+    dictSdsKeyCompare,          /* key compare */
+    dictSdsDestructor,          /* key destructor */
+    dictSdsDestructor           /* val destructor */
+};
 
 int htNeedsResize(dict *dict) {
     long long size, used;
@@ -733,6 +743,7 @@ int activeExpireCycleTryExpire(redisDb *db, dictEntry *de, long long now) {
         dbDelete(db,keyobj);
         notifyKeyspaceEvent(NOTIFY_EXPIRED,
             "expired",keyobj,db->id);
+        calculateCategoryMemorySpace(keyobj);
         decrRefCount(keyobj);
         server.stat_expiredkeys++;
         return 1;
@@ -1585,6 +1596,9 @@ void initServerConfig(void) {
     server.assert_line = 0;
     server.bug_report_start = 0;
     server.watchdog_period = 0;
+
+    /* category memory stats */
+    server.categoryStatsDict = dictCreate(&categoryStatsDictType, NULL);
 }
 
 extern char **environ;
@@ -3809,6 +3823,38 @@ void redisSetProcTitle(char *title) {
 #endif
 }
 
+
+/* 计算空间 */
+void calculateCategoryMemorySpace(robj *key) {
+    int len = strlen(key->ptr);
+    char *categoryKey = (char *)sdsnewlen(key->ptr, len);
+    for(int i = 0; i < len; i++) {
+        if(categoryKey[i] == '.') {
+            categoryKey[i] = '\0';
+            break;
+        }
+    }
+    sds k = sdsnewlen(categoryKey, strlen(categoryKey));// 这一步没必要
+    if(server.pre_memory_alloc == 0){
+        server.pre_memory_alloc = zmalloc_used_memory();
+    }
+    long long change = zmalloc_used_memory() - server.pre_memory_alloc;
+    server.pre_memory_alloc = zmalloc_used_memory();
+    char changeStr[50];
+    dictEntry *di;
+    if((di = dictFind(server.categoryStatsDict, k)) == NULL) {
+        sprintf(changeStr, " %lld" , change);
+        sds v = sdsnew(changeStr);
+        dictAdd(server.categoryStatsDict, k, v);
+    } else {
+        sds* oldv = dictGetVal(di);
+        long long old = atol((char *)oldv);
+        sprintf(changeStr, " %lld" , change + old);
+        sds v = sdsnew(changeStr);
+        dictDelete(server.categoryStatsDict,k);
+        dictAdd(server.categoryStatsDict, k, v);
+    }
+}
 /*
  * Check whether systemd or upstart have been used to start redis.
  */

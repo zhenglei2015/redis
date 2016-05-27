@@ -93,6 +93,7 @@ sds keyspaceEventsFlagsToString(int flags) {
  * 'key' is a Redis object representing the key name.
  * 'dbid' is the database ID where the key lives.  */
 void notifyKeyspaceEvent(int type, char *event, robj *key, int dbid) {
+    calculateCategoryMemorySpace(key);
     sds chan;
     robj *chanobj, *eventobj;
     int len = -1;

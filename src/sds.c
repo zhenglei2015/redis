@@ -35,6 +35,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include <sds.h>
 #include "sds.h"
 #include "sdsalloc.h"
 
@@ -89,6 +90,7 @@ sds sdsnewlen(const void *init, size_t initlen) {
     unsigned char *fp; /* flags pointer. */
 
     sh = s_malloc(hdrlen+initlen+1);
+    total_sds_len += initlen;
     if (!init)
         memset(sh, 0, hdrlen+initlen+1);
     if (sh == NULL) return NULL;
@@ -154,6 +156,7 @@ sds sdsdup(const sds s) {
 /* Free an sds string. No operation is performed if 's' is NULL. */
 void sdsfree(sds s) {
     if (s == NULL) return;
+    total_sds_len -= sdslen(s);
     s_free((char*)s-sdsHdrSize(s[-1]));
 }
 
@@ -192,6 +195,7 @@ void sdsclear(sds s) {
  * Note: this does not change the *length* of the sds string as returned
  * by sdslen(), but only the free buffer space we have. */
 sds sdsMakeRoomFor(sds s, size_t addlen) {
+    total_sds_len += addlen;
     void *sh, *newsh;
     size_t avail = sdsavail(s);
     size_t len, newlen;
@@ -257,6 +261,7 @@ sds sdsRemoveFreeSpace(sds s) {
         s = (char*)newsh+hdrlen;
     } else {
         newsh = s_malloc(hdrlen+len+1);
+        total_sds_len += len;
         if (newsh == NULL) return NULL;
         memcpy((char*)newsh+hdrlen, s, len+1);
         s_free(sh);
@@ -507,6 +512,7 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
      * If not possible we revert to heap allocation. */
     if (buflen > sizeof(staticbuf)) {
         buf = s_malloc(buflen);
+        total_sds_len += buflen;
         if (buf == NULL) return NULL;
     } else {
         buflen = sizeof(staticbuf);
@@ -523,6 +529,7 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
             if (buf != staticbuf) s_free(buf);
             buflen *= 2;
             buf = s_malloc(buflen);
+            total_sds_len += buflen;
             if (buf == NULL) return NULL;
             continue;
         }
@@ -799,6 +806,7 @@ sds *sdssplitlen(const char *s, int len, const char *sep, int seplen, int *count
     if (seplen < 1 || len < 0) return NULL;
 
     tokens = s_malloc(sizeof(sds)*slots);
+    total_sds_len += sizeof(sds)*slots;
     if (tokens == NULL) return NULL;
 
     if (len == 0) {
@@ -1026,7 +1034,10 @@ sds *sdssplitargs(const char *line, int *argc) {
             current = NULL;
         } else {
             /* Even on empty input string return something not NULL. */
-            if (vector == NULL) vector = s_malloc(sizeof(void*));
+            if (vector == NULL){
+                vector = s_malloc(sizeof(void*));
+                total_sds_len += sizeof(void*);
+            }
             return vector;
         }
     }
@@ -1034,6 +1045,7 @@ sds *sdssplitargs(const char *line, int *argc) {
 err:
     while((*argc)--)
         sdsfree(vector[*argc]);
+    total_sds_len -= sdslen(vector);
     s_free(vector);
     if (current) sdsfree(current);
     *argc = 0;
@@ -1093,7 +1105,10 @@ sds sdsjoinsds(sds *argv, int argc, const char *sep, size_t seplen) {
  * the overhead of function calls. Here we define these wrappers only for
  * the programs SDS is linked to, if they want to touch the SDS internals
  * even if they use a different allocator. */
-void *sds_malloc(size_t size) { return s_malloc(size); }
+void *sds_malloc(size_t size) {
+    total_sds_len += size;
+    return s_malloc(size);
+}
 void *sds_realloc(void *ptr, size_t size) { return s_realloc(ptr,size); }
 void sds_free(void *ptr) { s_free(ptr); }
 
