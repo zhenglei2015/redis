@@ -194,7 +194,7 @@ int dbDelete(redisDb *db, robj *key) {
     dictEntry *di = dictFind(server.categoryStatsDict, category);
     if(di) {
         sds oldv = dictGetVal(di);
-        addCateforyStats(key, 0 - sdsalloc(oldv));
+        addCateforyStats(key, 0 - sdsalloc(key->ptr)- sdsalloc(oldv));
     }
     if (dictDelete(db->dict,key->ptr) == DICT_OK) {
         if (server.cluster_enabled) slotToKeyDel(key);
