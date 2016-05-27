@@ -263,7 +263,6 @@ sds sdsRemoveFreeSpace(sds s) {
         s = (char*)newsh+hdrlen;
     } else {
         newsh = s_malloc(hdrlen+len+1);
-        total_sds_len += len;
         if (newsh == NULL) return NULL;
         memcpy((char*)newsh+hdrlen, s, len+1);
         s_free(sh);
@@ -272,7 +271,7 @@ sds sdsRemoveFreeSpace(sds s) {
         sdssetlen(s, len);
     }
     sdssetalloc(s, len);
-    total_sds_len = total_sds_len + sdsalloc(s) + oldAlloc;
+    total_sds_len = total_sds_len + sdsalloc(s) - oldAlloc;
     return s;
 }
 
@@ -1036,7 +1035,7 @@ sds *sdssplitargs(const char *line, int *argc) {
             /* Even on empty input string return something not NULL. */
             if (vector == NULL){
                 vector = s_malloc(sizeof(void*));
-                total_sds_len += sizeof(void*);
+//                total_sds_len += sizeof(void*);
             }
             return vector;
         }
@@ -1105,7 +1104,7 @@ sds sdsjoinsds(sds *argv, int argc, const char *sep, size_t seplen) {
  * the programs SDS is linked to, if they want to touch the SDS internals
  * even if they use a different allocator. */
 void *sds_malloc(size_t size) {
-    total_sds_len += size;
+//    total_sds_len += size;
     return s_malloc(size);
 }
 void *sds_realloc(void *ptr, size_t size) { return s_realloc(ptr,size); }
