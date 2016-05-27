@@ -80,6 +80,7 @@ static inline char sdsReqType(size_t string_size) {
  * end of the string. However the string is binary safe and can contain
  * \0 characters in the middle, as the length is stored in the sds header. */
 sds sdsnewlen(const void *init, size_t initlen) {
+    total_sds_len += initlen;
     void *sh;
     sds s;
     char type = sdsReqType(initlen);
@@ -90,7 +91,6 @@ sds sdsnewlen(const void *init, size_t initlen) {
     unsigned char *fp; /* flags pointer. */
 
     sh = s_malloc(hdrlen+initlen+1);
-    total_sds_len += initlen;
     if (!init)
         memset(sh, 0, hdrlen+initlen+1);
     if (sh == NULL) return NULL;
@@ -156,7 +156,7 @@ sds sdsdup(const sds s) {
 /* Free an sds string. No operation is performed if 's' is NULL. */
 void sdsfree(sds s) {
     if (s == NULL) return;
-    total_sds_len -= sdslen(s);
+    total_sds_len -= sdsalloc(s);
     s_free((char*)s-sdsHdrSize(s[-1]));
 }
 
@@ -195,7 +195,7 @@ void sdsclear(sds s) {
  * Note: this does not change the *length* of the sds string as returned
  * by sdslen(), but only the free buffer space we have. */
 sds sdsMakeRoomFor(sds s, size_t addlen) {
-    total_sds_len += addlen;
+    int oldAlloc = sdsalloc(s);
     void *sh, *newsh;
     size_t avail = sdsavail(s);
     size_t len, newlen;
@@ -237,6 +237,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
         sdssetlen(s, len);
     }
     sdssetalloc(s, newlen);
+    total_sds_len = total_sds_len + sdsalloc(s) - oldAlloc;
     return s;
 }
 
@@ -247,6 +248,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
  * After the call, the passed sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
 sds sdsRemoveFreeSpace(sds s) {
+    int oldAlloc = sdsalloc(s);
     void *sh, *newsh;
     char type, oldtype = s[-1] & SDS_TYPE_MASK;
     int hdrlen;
@@ -270,6 +272,7 @@ sds sdsRemoveFreeSpace(sds s) {
         sdssetlen(s, len);
     }
     sdssetalloc(s, len);
+    total_sds_len = total_sds_len + sdsalloc(s) + oldAlloc;
     return s;
 }
 
@@ -512,7 +515,6 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
      * If not possible we revert to heap allocation. */
     if (buflen > sizeof(staticbuf)) {
         buf = s_malloc(buflen);
-        total_sds_len += buflen;
         if (buf == NULL) return NULL;
     } else {
         buflen = sizeof(staticbuf);
@@ -529,7 +531,6 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
             if (buf != staticbuf) s_free(buf);
             buflen *= 2;
             buf = s_malloc(buflen);
-            total_sds_len += buflen;
             if (buf == NULL) return NULL;
             continue;
         }
@@ -806,7 +807,6 @@ sds *sdssplitlen(const char *s, int len, const char *sep, int seplen, int *count
     if (seplen < 1 || len < 0) return NULL;
 
     tokens = s_malloc(sizeof(sds)*slots);
-    total_sds_len += sizeof(sds)*slots;
     if (tokens == NULL) return NULL;
 
     if (len == 0) {
@@ -1045,7 +1045,6 @@ sds *sdssplitargs(const char *line, int *argc) {
 err:
     while((*argc)--)
         sdsfree(vector[*argc]);
-    total_sds_len -= sdslen(vector);
     s_free(vector);
     if (current) sdsfree(current);
     *argc = 0;
