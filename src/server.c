@@ -3828,7 +3828,7 @@ long long pre_alloc_sds = 0;
 /* 计算空间 */
 void calculateCategoryMemorySpace(robj *key) {
     extern long long total_sds_len;
-    printf("total_sds_len_aaaa %lld", total_sds_len);
+    printf("total_sds_len_aaaa %lld\n", total_sds_len);
     int len = strlen(key->ptr);
     if(pre_alloc_sds == 0){
         pre_alloc_sds = total_sds_len;
