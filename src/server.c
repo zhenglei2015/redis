@@ -3828,7 +3828,12 @@ long long pre_alloc_sds = 0;
 /* 计算空间 */
 void calculateCategoryMemorySpace(robj *key) {
     extern long long total_sds_len;
+    printf("total_sds_len_aaaa %lld", total_sds_len);
     int len = strlen(key->ptr);
+    if(pre_alloc_sds == 0){
+        pre_alloc_sds = total_sds_len;
+    }
+    long long change = total_sds_len - pre_alloc_sds;
     char *categoryKey = (char *)sdsnewlen(key->ptr, len);
     for(int i = 0; i < len; i++) {
         if(categoryKey[i] == '.') {
@@ -3837,10 +3842,6 @@ void calculateCategoryMemorySpace(robj *key) {
         }
     }
     sds k = sdsnewlen(categoryKey, strlen(categoryKey));// 这一步没必要
-    if(pre_alloc_sds == 0){
-        pre_alloc_sds = total_sds_len;
-    }
-    long long change = total_sds_len - pre_alloc_sds;
     pre_alloc_sds = total_sds_len;
     char changeStr[50];
     dictEntry *di;
