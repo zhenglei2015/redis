@@ -116,11 +116,11 @@ robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply) {
  *
  * The program is aborted if the key already exists. */
 void dbAdd(redisDb *db, robj *key, robj *val) {
-    if(val->type == OBJ_STRING)
-        addCateforyStats(key, sdsalloc(key->ptr) + sdsalloc(val->ptr));
 
     sds copy = sdsdup(key->ptr);
     int retval = dictAdd(db->dict, copy, val);
+    if(val->type == OBJ_STRING)
+        addCateforyStats(key, sdsalloc(copy) + sdsalloc(val->ptr));
     serverAssertWithInfo(NULL,key,retval == DICT_OK);
     if (val->type == OBJ_LIST) signalListAsReady(db, key);
     if (server.cluster_enabled) slotToKeyAdd(key);
