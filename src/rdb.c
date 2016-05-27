@@ -1375,7 +1375,7 @@ int rdbLoad(char *filename) {
         }
         /* Add the new object in the hash table */
         dbAdd(db,key,val);
-        calculateCategoryMemorySpace(key);
+//        calculateCategoryMemorySpace(key);
 
         /* Set the expire time if needed */
         if (expiretime != -1) setExpire(db,key,expiretime);
