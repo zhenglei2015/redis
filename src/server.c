@@ -124,6 +124,7 @@ struct redisServer server; /* server global state */
  */
 struct redisCommand redisCommandTable[] = {
     {"get",getCommand,2,"rF",0,NULL,1,1,1,0,0},
+    {"getStat",getStatCommand,2,"rF",0,NULL,1,1,1,0,0},
     {"set",setCommand,-3,"wm",0,NULL,1,1,1,0,0},
     {"setnx",setnxCommand,3,"wmF",0,NULL,1,1,1,0,0},
     {"setex",setexCommand,4,"wm",0,NULL,1,1,1,0,0},
@@ -232,6 +233,7 @@ struct redisCommand redisCommandTable[] = {
     {"echo",echoCommand,2,"F",0,NULL,0,0,0,0,0},
     {"save",saveCommand,1,"as",0,NULL,0,0,0,0,0},
     {"bgsave",bgsaveCommand,1,"a",0,NULL,0,0,0,0,0},
+    {"cc",categoryCommand,1,"a",0,NULL,0,0,0,0,0},
     {"bgrewriteaof",bgrewriteaofCommand,1,"a",0,NULL,0,0,0,0,0},
     {"shutdown",shutdownCommand,-1,"alt",0,NULL,0,0,0,0,0},
     {"lastsave",lastsaveCommand,1,"RF",0,NULL,0,0,0,0,0},
@@ -656,6 +658,15 @@ dictType replScriptCacheDictType = {
     dictSdsKeyCaseCompare,      /* key compare */
     dictSdsDestructor,          /* key destructor */
     NULL                        /* val destructor */
+};
+/* category StatsDictType */
+dictType categoryStatsDictType = {
+    dictSdsHash,                /* hash function */
+    NULL,                       /* key dup */
+    NULL,                       /* val dup */
+    dictSdsKeyCompare,          /* key compare */
+    dictSdsDestructor,          /* key destructor */
+    dictSdsDestructor           /* val destructor */
 };
 
 int htNeedsResize(dict *dict) {
@@ -1585,6 +1596,9 @@ void initServerConfig(void) {
     server.assert_line = 0;
     server.bug_report_start = 0;
     server.watchdog_period = 0;
+
+    /* category memory stats */
+    server.categoryStatsDict = dictCreate(&categoryStatsDictType, NULL);
 }
 
 extern char **environ;
@@ -3807,6 +3821,49 @@ void redisSetProcTitle(char *title) {
 #else
     UNUSED(title);
 #endif
+}
+
+sds getKeyCategory(robj *key) {
+    int len = strlen(key->ptr);
+    char *categoryKey = (char *)sdsnewlen(key->ptr, len);
+    for(int i = 0; i < len; i++) {
+        if(categoryKey[i] == '.') {
+            categoryKey[i] = '\0';
+            break;
+        }
+        if(i == len - 1)
+            return NULL;
+    }
+    sds k = sdsnewlen(categoryKey, strlen(categoryKey));// 这一步没必要
+    return k;
+}
+
+void addCateforyStats(robj *key, int valsize) {
+    int len = strlen(key->ptr);
+    char *categoryKey = (char *)sdsnewlen(key->ptr, len);
+    for(int i = 0; i < len; i++) {
+        if(categoryKey[i] == '.') {
+            categoryKey[i] = '\0';
+            break;
+        }
+    }
+    sds k = sdsnewlen(categoryKey, strlen(categoryKey));// 这一步没必要
+
+    long long change = valsize;
+    char changeStr[50];
+    dictEntry *di;
+    if((di = dictFind(server.categoryStatsDict, k)) == NULL) {
+        sprintf(changeStr, " %lld" , change);
+        sds v = sdsnew(changeStr);
+        dictAdd(server.categoryStatsDict, k, v);
+    } else {
+        sds* oldv = dictGetVal(di);
+        long long old = atol((char *)oldv);
+        sprintf(changeStr, " %lld" , change + old);
+        sds v = sdsnew(changeStr);
+        dictDelete(server.categoryStatsDict,k);
+        dictAdd(server.categoryStatsDict, k, v);
+    }
 }
 
 /*

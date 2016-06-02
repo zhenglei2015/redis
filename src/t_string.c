@@ -173,6 +173,17 @@ void getCommand(client *c) {
     getGenericCommand(c);
 }
 
+void getStatCommand(client *c) {
+    dictEntry *di = dictFind(server.categoryStatsDict, c->argv[1]->ptr);
+    if (!di) {
+        char zero[2] = "0\0";
+        addReplyBulk(c, createObject(OBJ_STRING, (char *) zero));
+    } else {
+        sds *size = dictGetVal(di);
+        addReplyBulk(c, createObject(OBJ_STRING, (char *) size));
+    }
+}
+
 void getsetCommand(client *c) {
     if (getGenericCommand(c) == C_ERR) return;
     c->argv[2] = tryObjectEncoding(c->argv[2]);
