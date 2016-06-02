@@ -3837,8 +3837,19 @@ sds getKeyCategory(robj *key) {
     sds k = sdsnewlen(categoryKey, strlen(categoryKey));// 这一步没必要
     return k;
 }
+
+
+void subCategoryStats(robj *key, dict *db) {
+    dictEntry *di = dictFind(db, key->ptr);
+    if(di) {
+        robj* oldv = dictGetVal(di);
+        printf("dddd key %s val %s vallen %d\n", key->ptr, oldv->ptr, sdslen(oldv->ptr));
+        addCateforyStats(key, 0 - sdslen(key->ptr)- sdslen(oldv->ptr));
+    }
+}
+
 void addCateforyStats(robj *key, int valsize) {
-    printf("aaaa %d\n", valsize);
+    printf("aaaa key %s size %d\n", key->ptr,  valsize);
     int len = strlen(key->ptr);
     char *categoryKey = (char *)sdsnewlen(key->ptr, len);
     for(int i = 0; i < len; i++) {

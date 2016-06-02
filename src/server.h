@@ -1082,6 +1082,7 @@ void exitFromChild(int retcode);
 size_t redisPopcount(void *s, long count);
 void redisSetProcTitle(char *title);
 void addCateforyStats(robj *key, int size);
+void subCategoryStats(robj *key, dict *db);
 sds getKeyCategory(robj *key);
 
 /* networking.c -- Networking and Client related operations */

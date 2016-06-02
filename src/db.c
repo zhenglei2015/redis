@@ -119,8 +119,6 @@ void dbAdd(redisDb *db, robj *key, robj *val) {
 
     sds copy = sdsdup(key->ptr);
     int retval = dictAdd(db->dict, copy, val);
-    if(val->type == OBJ_STRING)
-        addCateforyStats(key, sdsalloc(copy) + sdsalloc(val->ptr));
     serverAssertWithInfo(NULL,key,retval == DICT_OK);
     if (val->type == OBJ_LIST) signalListAsReady(db, key);
     if (server.cluster_enabled) slotToKeyAdd(key);
@@ -146,12 +144,17 @@ void dbOverwrite(redisDb *db, robj *key, robj *val) {
  * 3) The expire time of the key is reset (the key is made persistent). */
 void setKey(redisDb *db, robj *key, robj *val) {
     if (lookupKeyWrite(db,key) == NULL) {
+        addCateforyStats(key, sdsalloc(val->ptr) + sdsalloc(key->ptr));
         dbAdd(db,key,val);
     } else {
+        robj *oldval = lookupKey(db, key);
+        addCateforyStats(key, sdsalloc(val->ptr) - sdsalloc(oldval->ptr));
         dbOverwrite(db,key,val);
     }
     incrRefCount(val);
-    removeExpire(db,key);
+    if(removeExpire(db,key)) {
+        addCateforyStats(key, - sdsalloc(key->ptr) - sdsalloc(val->ptr));
+    }
     signalModifiedKey(db,key);
 }
 
@@ -190,12 +193,7 @@ int dbDelete(redisDb *db, robj *key) {
     /* Deleting an entry from the expires dict will not free the sds of
      * the key, because it is shared with the main dictionary. */
     if (dictSize(db->expires) > 0) dictDelete(db->expires,key->ptr);
-    sds category = getKeyCategory(key);
-    dictEntry *di = dictFind(server.categoryStatsDict, category);
-    if(di) {
-        sds oldv = dictGetVal(di);
-        addCateforyStats(key, 0 - sdsalloc(key->ptr)- sdsalloc(oldv));
-    }
+
     if (dictDelete(db->dict,key->ptr) == DICT_OK) {
         if (server.cluster_enabled) slotToKeyDel(key);
         return 1;
@@ -792,6 +790,7 @@ void moveCommand(client *c) {
         addReply(c,shared.czero);
         return;
     }
+
     dbAdd(dst,c->argv[1],o);
     if (expire != -1) setExpire(dst,c->argv[1],expire);
     incrRefCount(o);
