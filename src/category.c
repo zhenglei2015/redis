@@ -11,7 +11,7 @@ ssize_t sizeOfStringObject(robj *obj) {
     }
 }
 
-ssize_t categoryObjectSize(robj *o){
+long long categoryObjectSize(robj *o){
     if (o->type == OBJ_STRING) {
         /* Save a string value */
         sizeOfStringObject(o);
@@ -20,11 +20,11 @@ ssize_t categoryObjectSize(robj *o){
         if (o->encoding == OBJ_ENCODING_QUICKLIST) {
             quicklist *ql = o->ptr;
             quicklistNode *node = ql->head;
-            ssize_t totalsize = 0;
+            long long totalsize = 0;
             do {
                 if (quicklistNodeIsCompressed(node)) {
                     void *data;
-                    size_t compress_len = quicklistGetLzf(node, &data);
+                    long long compress_len = quicklistGetLzf(node, &data);
                     totalsize += compress_len;
                 } else {
                     totalsize += node->sz;
@@ -39,14 +39,14 @@ ssize_t categoryObjectSize(robj *o){
             dict *set = o->ptr;
             dictIterator *di = dictGetIterator(set);
             dictEntry *de;
-            ssize_t totalsize = 0;
+            long long totalsize = 0;
             while((de = dictNext(di)) != NULL) {
                 robj *eleobj = dictGetKey(de);
                 totalsize += sizeOfStringObject(eleobj);
             }
             dictReleaseIterator(di);
         } else if (o->encoding == OBJ_ENCODING_INTSET) {
-            size_t l = intsetBlobLen((intset*)o->ptr);
+            long long l = intsetBlobLen((intset*)o->ptr);
             return l;
         } else {
             serverPanic("Unknown set encoding");
@@ -54,13 +54,13 @@ ssize_t categoryObjectSize(robj *o){
     } else if (o->type == OBJ_ZSET) {
         /* Save a sorted set value */
         if (o->encoding == OBJ_ENCODING_ZIPLIST) {
-            size_t l = ziplistBlobLen((unsigned char*)o->ptr);
+            long long l = ziplistBlobLen((unsigned char*)o->ptr);
             return l;
         } else if (o->encoding == OBJ_ENCODING_SKIPLIST) {
             zset *zs = o->ptr;
             dictIterator *di = dictGetIterator(zs->dict);
             dictEntry *de;
-            ssize_t totalsize = 0;
+            long long totalsize = 0;
             while((de = dictNext(di)) != NULL) {
                 robj *eleobj = dictGetKey(de);
                 totalsize += sizeOfStringObject(eleobj);
@@ -73,13 +73,13 @@ ssize_t categoryObjectSize(robj *o){
     } else if (o->type == OBJ_HASH) {
         /* Save a hash value */
         if (o->encoding == OBJ_ENCODING_ZIPLIST) {
-            size_t l = ziplistBlobLen((unsigned char*)o->ptr);
+            long long l = ziplistBlobLen((unsigned char*)o->ptr);
             return l;
 
         } else if (o->encoding == OBJ_ENCODING_HT) {
             dictIterator *di = dictGetIterator(o->ptr);
             dictEntry *de;
-            ssize_t totalsize = 0;
+            long long totalsize = 0;
             while((de = dictNext(di)) != NULL) {
                 robj *key = dictGetKey(de);
                 robj *val = dictGetVal(de);
@@ -109,12 +109,12 @@ void saveResult(dict* tempDict) {
     dictIterator *di = dictGetIterator(tempDict);
     dictEntry *de;
     char *line;
-    line = (char *)zmalloc(1000);
+    line = (char *)zmalloc(10000);
     while((de = dictNext(di)) != NULL) {
         sds key = dictGetKey(de);
         sds val = dictGetVal(de);
         int totalLen = sdslen(key) + sdslen(val);
-        if(totalLen > 1000) {
+        if(totalLen > 10000) {
             zfree(line);
             line = zmalloc(totalLen + 200);
         }
@@ -158,7 +158,7 @@ void doCalculateCategory() {
 
         initStaticStringObject(key,keystr);
         int keysize = sdslen(keystr);
-        ssize_t objsize = categoryObjectSize(o);
+        long long objsize = categoryObjectSize(o);
         addCateforyStats(&key, keysize + objsize, tempDict);
     }
     dictReleaseIterator(di);
@@ -198,7 +198,7 @@ void *waitToUpdate(void *p) {
 }
 
 
-void addCateforyStats(robj *key, int valsize, dict* tempDict) {
+void addCateforyStats(robj *key, long long valsize, dict* tempDict) {
     int len = strlen(key->ptr);
     char *categoryKey = (char *)sdsnewlen(key->ptr, len);
     for(int i = 0; i < len; i++) {
