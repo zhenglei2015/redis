@@ -2,10 +2,7 @@
 
 static char *filename = "category.txt";
 
-/* Like rdbSaveStringObjectRaw() but handle encoded objects */
 ssize_t sizeOfStringObject(robj *obj) {
-    /* Avoid to decode the object, then encode it again, if the
-     * object is already integer encoded. */
     if (obj->encoding == OBJ_ENCODING_INT) {
         return sizeof(long long);
     } else {
@@ -14,7 +11,6 @@ ssize_t sizeOfStringObject(robj *obj) {
     }
 }
 
-/* Save a Redis object. Returns -1 on error, number of bytes written on success. */
 ssize_t categoryObjectSize(robj *o){
     if (o->type == OBJ_STRING) {
         /* Save a string value */
@@ -25,7 +21,6 @@ ssize_t categoryObjectSize(robj *o){
             quicklist *ql = o->ptr;
             quicklistNode *node = ql->head;
             ssize_t totalsize = 0;
-
             do {
                 if (quicklistNodeIsCompressed(node)) {
                     void *data;
@@ -113,16 +108,22 @@ void saveResult(dict* tempDict) {
 
     dictIterator *di = dictGetIterator(tempDict);
     dictEntry *de;
+    char *line;
+    line = (char *)zmalloc(1000);
     while((de = dictNext(di)) != NULL) {
         sds key = dictGetKey(de);
         sds val = dictGetVal(de);
-        char line[1000];
         int totalLen = sdslen(key) + sdslen(val);
+        if(totalLen > 1000) {
+            zfree(line);
+            line = zmalloc(totalLen + 200);
+        }
         snprintf(line, totalLen + 20, "%s$$%s\n", key, val);
         rioWrite(&r, line, totalLen + 3);
     }
+    zfree(line);
     dictReleaseIterator(di);
-    /* Make sure data will not remain on the OS's output buffers */
+    // flush 掉
     if (fflush(fp) == EOF) goto werr;
     if (fsync(fileno(fp)) == -1) goto werr;
     if (fclose(fp) == EOF) goto werr;
@@ -169,8 +170,8 @@ void categoryInfoInsert(void *p) {
     FILE *file = fopen(filename, "r");
     rio r;
     rioInitWithFile(&r, file);
-    char line[2000];
-    int len = 1000;
+    char line[10000];
+    int len = 10000;
     dictEmpty(server.categoryStatsDict, NULL);
     while(fgets(line,len,file)!=NULL) {
         int pos = strstr(line, "$$") - line;
@@ -190,7 +191,7 @@ void categoryInfoInsert(void *p) {
 void *waitToUpdate(void *p) {
     pid_t calp = *(pid_t*)(p);
     waitpid(calp,NULL,0);
-    printf("wait over\n");
+    printf("category occupy memory space over\n");
     dictEmpty(server.categoryStatsDict, NULL);
     categoryInfoInsert(0);
     return ((void *)0);
