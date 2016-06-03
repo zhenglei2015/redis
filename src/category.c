@@ -106,5 +106,22 @@ ssize_t categoryObjectSize(robj *o){
 
 void saveResult() {
     rio r;
-    FILE fp;
+    FILE *fp;
+    char tmpfile[300];
+
+    snprintf(tmpfile,256,"temp-%d.rdb", (int) getpid());
+    fp = fopen(tmpfile, "w");
+    rioInitWithFile(&r,fp);
+
+    dictIterator *di = dictGetIterator(server.categoryStatsDict);
+    dictEntry *de;
+    ssize_t totalsize = 0;
+    while((de = dictNext(di)) != NULL) {
+        robj *key = dictGetKey(de);
+        robj *val = dictGetVal(de);
+        totalsize += sizeOfStringObject(key);
+        totalsize += sizeOfStringObject(val);
+    }
+    dictReleaseIterator(di);
+
 }
