@@ -1,6 +1,5 @@
 #include "category.h"
 
-
 static char *filename = "category.txt";
 
 /* Like rdbSaveStringObjectRaw() but handle encoded objects */
@@ -166,7 +165,6 @@ void doCalculateCategory() {
 }
 
 void categoryInfoInsert(void *p) {
-    printf("CCCCCCCCCCCCCCCCCCCCCC\n");
     p = NULL; // 防止 warning
     FILE *file = fopen(filename, "r");
     rio r;
