@@ -234,6 +234,7 @@ void ccCommand(client *c) {
         doCalculateCategory();
         exit(0);
     } else {
+        printf("xxxxx %d\n", p);
         pthread_t tid;
         printf("CCCCCCCCCCC start %d \n", p);
         if (pthread_create(&tid,NULL,waitToUpdate,&p) == 0) {
