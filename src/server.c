@@ -2580,7 +2580,7 @@ int prepareForShutdown(int flags) {
     }
 
     /* Create a new RDB file before exiting. */
-    if ((int)getpid() != server.calculateCategoryChild && (server.saveparamslen > 0 && !nosave) || save) {
+    if ((server.saveparamslen > 0 && !nosave) || save) {
         serverLog(LL_NOTICE,"Saving the final RDB snapshot before exiting.");
         /* Snapshotting. Perform a SYNC SAVE and exit */
         if (rdbSave(server.rdb_filename) != C_OK) {
@@ -3737,7 +3737,9 @@ static void sigShutdownHandler(int sig) {
     default:
         msg = "Received shutdown signal, scheduling shutdown...";
     };
-
+    if((int)getpid() == server.calculateCategoryChild) {
+        exit(0);
+    }
     /* SIGINT is often delivered via Ctrl+C in an interactive session.
      * If we receive the signal the second time, we interpret this as
      * the user really wanting to quit ASAP without waiting to persist
