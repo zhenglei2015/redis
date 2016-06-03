@@ -1083,7 +1083,6 @@ uint64_t crc64(uint64_t crc, const unsigned char *s, uint64_t l);
 void exitFromChild(int retcode);
 size_t redisPopcount(void *s, long count);
 void redisSetProcTitle(char *title);
-sds getKeyCategory(robj *key);
 
 /* networking.c -- Networking and Client related operations */
 client *createClient(int fd);
