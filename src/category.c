@@ -191,7 +191,7 @@ void *waitToUpdate(void *p) {
     pid_t calp = *(pid_t*)(p);
     waitpid(calp,NULL,0);
     printf("wait over\n");
-    dictEmpty(server.categoryStatsDict, categoryInfoInsert);
+    dictEmpty(server.categoryStatsDict, NULL);
     categoryInfoInsert(0);
     return ((void *)0);
 }
