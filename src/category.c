@@ -235,6 +235,7 @@ void ccCommand(client *c) {
         exit(0);
     } else {
         pthread_t tid;
+        printf("CCCCCCCCCCC start %d \n", tid);
         if (pthread_create(&tid,NULL,waitToUpdate,&p) == 0) {
             pthread_detach(tid);
             char line[300];
