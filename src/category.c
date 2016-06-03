@@ -14,7 +14,6 @@ ssize_t sizeOfStringObject(robj *obj) {
     }
 }
 
-
 /* Save a Redis object. Returns -1 on error, number of bytes written on success. */
 ssize_t categoryObjectSize(robj *o){
     if (o->type == OBJ_STRING) {
@@ -109,19 +108,70 @@ void saveResult() {
     FILE *fp;
     char tmpfile[300];
 
-    snprintf(tmpfile,256,"temp-%d.rdb", (int) getpid());
+    snprintf(tmpfile,256,"category-%d.txt", (int) getpid());
     fp = fopen(tmpfile, "w");
     rioInitWithFile(&r,fp);
 
     dictIterator *di = dictGetIterator(server.categoryStatsDict);
     dictEntry *de;
-    ssize_t totalsize = 0;
     while((de = dictNext(di)) != NULL) {
-        robj *key = dictGetKey(de);
-        robj *val = dictGetVal(de);
-        totalsize += sizeOfStringObject(key);
-        totalsize += sizeOfStringObject(val);
+        sds key = dictGetKey(de);
+        sds val = dictGetVal(de);
+        char line[1000];
+        int totalLen = sdslen(key) + sdslen(val) + 3;
+        snprintf(line, totalLen, "%s$$%s\n", key, val);
+        rioWrite(&r, line, totalLen);
     }
     dictReleaseIterator(di);
+    /* Make sure data will not remain on the OS's output buffers */
+    if (fflush(fp) == EOF) goto werr;
+    if (fsync(fileno(fp)) == -1) goto werr;
+    if (fclose(fp) == EOF) goto werr;
+    return;
 
+    werr:
+    serverLog(LL_WARNING,"Write error saving DB on disk: %s", strerror(errno));
+    fclose(fp);
+    unlink(tmpfile);
+    return ;
 }
+
+void emptyCategoryStatsDict() {
+    dictEmpty(server.categoryStatsDict, NULL);
+}
+
+void doCalculateCategory() {
+    emptyCategoryStatsDict();
+    dictIterator *di = NULL;
+    dictEntry *de;
+
+    dict *d = server.db[0].dict;
+    if (dictSize(d) == 0) return;
+    di = dictGetSafeIterator(d);
+    if (!di) return ;
+
+    /* Iterate this DB writing every entry */
+    while((de = dictNext(di)) != NULL) {
+        sds keystr = dictGetKey(de);
+        robj key, *o = dictGetVal(de);
+
+        initStaticStringObject(key,keystr);
+        int keysize = sdslen(keystr);
+        ssize_t objsize = categoryObjectSize(o);
+        addCateforyStats(&key, keysize + objsize);
+    }
+    dictReleaseIterator(di);
+    saveResult();
+}
+void ccCommand(client *c) {
+    if(fork() == 0) {
+        doCalculateCategory();
+        saveResult();
+        exit(0);
+    } else {
+        char line[300];
+        snprintf(line, 256, "%d is runing to do calculate", (int) getpid());
+        addReplyStatus(c, line);
+    }
+}
+
