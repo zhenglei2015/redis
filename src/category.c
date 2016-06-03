@@ -197,6 +197,7 @@ void *waitToUpdate(void *p) {
     categoryInfoInsert(0);
     long long te = time(NULL);
     printf("time used %lld\n", te - ts);
+    server.calculateCategoryChild = -1;
     return ((void *)0);
 }
 
@@ -230,10 +231,13 @@ void addCateforyStats(robj *key, long long valsize, dict* tempDict) {
 
 void ccCommand(client *c) {
     pid_t p;
-    if((p = fork()) == 0) {
+    if(server.calculateCategoryChild != -1) {
+        addReplyError(c, "ctegory calculating thread is running\n");
+    } else if((p = fork()) == 0) {
         doCalculateCategory();
         exit(0);
     } else {
+        server.calculateCategoryChild = p;
         printf("xxxxx %d\n", p);
         pthread_t tid;
         printf("CCCCCCCCCCC start %d \n", p);

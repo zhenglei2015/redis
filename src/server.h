@@ -772,6 +772,7 @@ struct redisServer {
     long long stat_net_output_bytes; /* Bytes written to network. */
     long long pre_memory_alloc;
     dict* categoryStatsDict;
+    pid_t calculateCategoryChild;
     /* The following two are used to track instantaneous metrics, like
      * number of operations per second, network traffic. */
     struct {
