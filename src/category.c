@@ -192,7 +192,7 @@ void *waitToUpdate(void *p) {
     pid_t calp = *(pid_t*)(p);
     long long ts = time(NULL);
     waitpid(calp,NULL,0);
-    printf("category occupy memory space over\n");
+    printf("category occupy memory space over pid %d\n", calp);
     dictEmpty(server.categoryStatsDict, NULL);
     categoryInfoInsert(0);
     long long te = time(NULL);
