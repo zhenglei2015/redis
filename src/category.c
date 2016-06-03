@@ -1,6 +1,7 @@
 #include "category.h"
 
 
+static char *filename = "category.txt";
 
 /* Like rdbSaveStringObjectRaw() but handle encoded objects */
 ssize_t sizeOfStringObject(robj *obj) {
@@ -103,30 +104,33 @@ ssize_t categoryObjectSize(robj *o){
     return -1;
 }
 
-void saveResult() {
+void saveResult(dict* tempDict) {
     rio r;
     FILE *fp;
     char tmpfile[300];
-
     snprintf(tmpfile,256,"category-%d.txt", (int) getpid());
     fp = fopen(tmpfile, "w");
     rioInitWithFile(&r,fp);
 
-    dictIterator *di = dictGetIterator(server.categoryStatsDict);
+    dictIterator *di = dictGetIterator(tempDict);
     dictEntry *de;
     while((de = dictNext(di)) != NULL) {
         sds key = dictGetKey(de);
         sds val = dictGetVal(de);
         char line[1000];
-        int totalLen = sdslen(key) + sdslen(val) + 3;
-        snprintf(line, totalLen, "%s$$%s\n", key, val);
-        rioWrite(&r, line, totalLen);
+        int totalLen = sdslen(key) + sdslen(val);
+        snprintf(line, totalLen + 20, "%s$$%s\n", key, val);
+        rioWrite(&r, line, totalLen + 3);
     }
     dictReleaseIterator(di);
     /* Make sure data will not remain on the OS's output buffers */
     if (fflush(fp) == EOF) goto werr;
     if (fsync(fileno(fp)) == -1) goto werr;
     if (fclose(fp) == EOF) goto werr;
+    if(rename(tmpfile,filename) == -1) {
+            unlink(tmpfile);
+            goto werr;
+    }
     return;
 
     werr:
@@ -136,12 +140,9 @@ void saveResult() {
     return ;
 }
 
-void emptyCategoryStatsDict() {
-    dictEmpty(server.categoryStatsDict, NULL);
-}
-
 void doCalculateCategory() {
-    emptyCategoryStatsDict();
+    dict *tempDict;
+    tempDict = dictCreate(&categoryStatsDictType, NULL);
     dictIterator *di = NULL;
     dictEntry *de;
 
@@ -158,20 +159,87 @@ void doCalculateCategory() {
         initStaticStringObject(key,keystr);
         int keysize = sdslen(keystr);
         ssize_t objsize = categoryObjectSize(o);
-        addCateforyStats(&key, keysize + objsize);
+        addCateforyStats(&key, keysize + objsize, tempDict);
     }
     dictReleaseIterator(di);
-    saveResult();
+    saveResult(tempDict);
 }
-void ccCommand(client *c) {
-    if(fork() == 0) {
-        doCalculateCategory();
-        saveResult();
-        exit(0);
+
+void categoryInfoInsert(void *p) {
+    printf("CCCCCCCCCCCCCCCCCCCCCC\n");
+    p = NULL; // 防止 warning
+    FILE *file = fopen(filename, "r");
+    rio r;
+    rioInitWithFile(&r, file);
+    char line[2000];
+    int len = 1000;
+    dictEmpty(server.categoryStatsDict, NULL);
+    while(fgets(line,len,file)!=NULL) {
+        int pos = strstr(line, "$$") - line;
+        if(pos > 0) {
+            sds key = sdsnewlen(line, pos);
+            sds val = sdsnewlen(line + pos + 2, strlen(line) - pos - 3);
+            if(dictAdd(server.categoryStatsDict, key, val) != DICT_OK) {
+
+            } else {
+
+            }
+        }
+    }
+    fclose(file);
+}
+
+void *waitToUpdate(void *p) {
+    pid_t calp = *(pid_t*)(p);
+    waitpid(calp,NULL,0);
+    printf("wait over\n");
+    dictEmpty(server.categoryStatsDict, categoryInfoInsert);
+    categoryInfoInsert(0);
+    return ((void *)0);
+}
+
+
+void addCateforyStats(robj *key, int valsize, dict* tempDict) {
+    int len = strlen(key->ptr);
+    char *categoryKey = (char *)sdsnewlen(key->ptr, len);
+    for(int i = 0; i < len; i++) {
+        if(categoryKey[i] == '.') {
+            categoryKey[i] = '\0';
+            break;
+        }
+    }
+    sds k = sdsnewlen(categoryKey, strlen(categoryKey));// 这一步没必要
+    long long change = valsize;
+    char changeStr[50];
+    dictEntry *di;
+    if((di = dictFind(tempDict, k)) == NULL) {
+        sprintf(changeStr, "%lld" , change);
+        sds v = sdsnew(changeStr);
+        dictAdd(tempDict, k, v);
     } else {
-        char line[300];
-        snprintf(line, 256, "%d is runing to do calculate", (int) getpid());
-        addReplyStatus(c, line);
+        sds* oldv = dictGetVal(di);
+        long long old = atol((char *)oldv);
+        sprintf(changeStr, "%lld" , change + old);
+        sds v = sdsnew(changeStr);
+        dictDelete(tempDict,k);
+        dictAdd(tempDict, k, v);
     }
 }
 
+void ccCommand(client *c) {
+    pid_t p;
+    if((p = fork()) == 0) {
+        doCalculateCategory();
+        exit(0);
+    } else {
+        pthread_t tid;
+        if (pthread_create(&tid,NULL,waitToUpdate,&p) == 0) {
+            pthread_detach(tid);
+            char line[300];
+            snprintf(line, 256, "%d is runing to do calculate", (int) getpid());
+            addReplyStatus(c, line);
+        } else {
+            addReplyStatus(c, "create wait thread failed");
+        }
+    }
+}

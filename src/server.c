@@ -3839,34 +3839,6 @@ sds getKeyCategory(robj *key) {
     return k;
 }
 
-void addCateforyStats(robj *key, int valsize) {
-    int len = strlen(key->ptr);
-    char *categoryKey = (char *)sdsnewlen(key->ptr, len);
-    for(int i = 0; i < len; i++) {
-        if(categoryKey[i] == '.') {
-            categoryKey[i] = '\0';
-            break;
-        }
-    }
-    sds k = sdsnewlen(categoryKey, strlen(categoryKey));// 这一步没必要
-
-    long long change = valsize;
-    char changeStr[50];
-    dictEntry *di;
-    if((di = dictFind(server.categoryStatsDict, k)) == NULL) {
-        sprintf(changeStr, " %lld" , change);
-        sds v = sdsnew(changeStr);
-        dictAdd(server.categoryStatsDict, k, v);
-    } else {
-        sds* oldv = dictGetVal(di);
-        long long old = atol((char *)oldv);
-        sprintf(changeStr, " %lld" , change + old);
-        sds v = sdsnew(changeStr);
-        dictDelete(server.categoryStatsDict,k);
-        dictAdd(server.categoryStatsDict, k, v);
-    }
-}
-
 /*
  * Check whether systemd or upstart have been used to start redis.
  */
